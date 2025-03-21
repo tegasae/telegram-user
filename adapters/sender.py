@@ -16,4 +16,6 @@ class FakeSenderService(AbstractSenderService):
         print(aggregate.message.message)
         for r in aggregate.receivers:
             print(r.name)
+            print(r.id)
+            print(" ")
         return True

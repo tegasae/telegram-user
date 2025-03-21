@@ -38,12 +38,14 @@ class Service:
             message = self.uow.repository.get_message(message_id)
             if message_id != message.id:
                 raise MessageNotFound()
-
-        for r in receivers_id:
-            if self.check_id(r):
-                receiver = self.uow.repository.get_receiver(r)
-                if r == receiver.id:
-                    receivers.append(receiver)
+        if len(receivers_id)==0:
+            receivers=self.uow.repository.get_receivers()
+        else:
+            for r in receivers_id:
+                if self.check_id(r):
+                    receiver = self.uow.repository.get_receiver(r)
+                    if r == receiver.id:
+                        receivers.append(receiver)
 
         aggregate = Aggregate(sender=sender, receivers=receivers, message=message)
         self.sender_service.send(aggregate)

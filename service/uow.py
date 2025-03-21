@@ -1,7 +1,7 @@
 from __future__ import annotations
 import abc
 
-from adapters.repository import AbstractRepository, FakeRepository
+from adapters.repository import AbstractRepository, FakeRepository, AlmostRepository
 
 
 class AbstractUnitOfWork(abc.ABC):
@@ -52,3 +52,15 @@ class FakeUnitOfWork(AbstractUnitOfWork):
 
     def rollback(self):
         print("Fake rollback")
+
+
+class AlmostUnitOfWork(AbstractUnitOfWork):
+    def __init__(self):
+        self.repository = AlmostRepository()
+
+    def _commit(self):
+        print("Almost commit")
+
+    def rollback(self):
+        print("Almost rollback")
+
