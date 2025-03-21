@@ -1,0 +1,5 @@
+
+api_id 28172272
+api_hash d06bd430d4b4ee0a6e9d08b2fd9d68e7
+my application
+myapp1
