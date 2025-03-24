@@ -18,3 +18,14 @@ class MessageNotFound(CommonException):
     def create_message(self):
         self.base_message = f'The message isn\'t found{self.m}'
 
+
+class DataIsNotGot(CommonException):
+    def create_message(self):
+        self.base_message = f'The data is not got {self.m}'
+
+class DataIsWrong(CommonException):
+    def create_message(self):
+        self.base_message = f'The data is wrong {self.m}'
+
+
+

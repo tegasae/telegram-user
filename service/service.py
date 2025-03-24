@@ -25,28 +25,33 @@ class Service:
     def get_receivers(self) -> list[Receiver]:
         return self.uow.repository.get_receivers()
 
-    def send(self, sender_id: int, receivers_id: list[int], message_id: int):
-        receivers = []
-        message: Message = Message(id=0, message="")
-        sender: Sender = Sender(id=0, name="", api_id=0, api_hash="", telegram_id="")
-        if self.check_id(sender_id):
-            sender = self.uow.repository.get_sender(sender_id=sender_id)
-            if sender_id != sender.id:
-                raise SenderNotFound()
+    def send_message(self, sender_id: int, receivers_id: list[int], message_id: int):
+
+        message: Message = Message.empty_message()
 
         if self.check_id(message_id):
             message = self.uow.repository.get_message(message_id)
             if message_id != message.id:
                 raise MessageNotFound()
-        if len(receivers_id)==0:
-            receivers=self.uow.repository.get_receivers()
-        else:
-            for r in receivers_id:
-                if self.check_id(r):
-                    receiver = self.uow.repository.get_receiver(r)
-                    if r == receiver.id:
-                        receivers.append(receiver)
+        self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+
+    def send_new_message(self, sender_id: int, receivers_id: list[int], message_text: str):
+        message: Message = Message(id=0, message=message_text)
+        self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+
+    def _send(self, sender_id: int, receivers_id: list[int], message: Message):
+        receivers = []
+        sender: Sender = Sender.empty_sender()
+        if self.check_id(sender_id):
+            sender = self.uow.repository.get_sender(sender_id=sender_id)
+            if sender_id != sender.id:
+                raise SenderNotFound()
+
+        for r in receivers_id:
+            if self.check_id(r):
+                receiver = self.uow.repository.get_receiver(r)
+                if r == receiver.id:
+                    receivers.append(receiver)
 
         aggregate = Aggregate(sender=sender, receivers=receivers, message=message)
         self.sender_service.send(aggregate)
-

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import abc
 
-from adapters.repository import AbstractRepository, FakeRepository, AlmostRepository
+from adapters.repository import AbstractRepository, FakeRepository, AlmostRepository, HTTPRepository
 
 
 class AbstractUnitOfWork(abc.ABC):
@@ -64,3 +64,13 @@ class AlmostUnitOfWork(AbstractUnitOfWork):
     def rollback(self):
         print("Almost rollback")
 
+
+class HTTPUnitOfWork(AbstractUnitOfWork):
+    def __init__(self, url):
+        self.repository = HTTPRepository(url)
+
+    def _commit(self):
+        print("HTTP commit")
+
+    def rollback(self):
+        print("HTTP rollback")
