@@ -288,39 +288,40 @@ class HTTPRepository(AlmostRepository):
 
         self.start_time = time.time()
         self.delta_time = 1
-        # self._initialized = False
 
-        # asyncio.run(self.m())
-        asyncio.run(self._get_data_http())
-        # self._initialized = True
+        self._session = None
 
-    #   async def m(self):
-    #       await asyncio.gather(self._get_data_http(url='http://192.168.100.148:8080/api/v1/n/user/'),
-    #       self._get_data_http(url='http://192.168.100.147:8080/api/v1/n/user/'))
-    #       #task_a =asyncio.create_task(self._get_data_http(url='http://192.168.100.148:8080/api/v1/n/user/'))
-    #       #task_b = asyncio.create_task(self._get_data_http(url='http://192.168.100.147:8080/api/v1/n/user/'))
-    #       #await task_a
-    #       #await task_b
+
+    async def initialize(self):
+        """Инициализация, которую нужно вызывать явно"""
+        await self._get_data_http()
 
     def _check_stale(self):
         if time.time() - self.start_time >= self.delta_time:
-            asyncio.run(self._get_data_http())
+            # Используем create_task вместо прямого вызова
+            asyncio.create_task(self._get_data_http())
 
     async def _get_data_http(self):
         try:
+            #if not self._session:
+            #    self._session = aiohttp.ClientSession()
+
+            #async with self._session.get(self.url) as response:
             async with aiohttp.ClientSession() as session:
-                # async with session.get('http://192.168.100.148:8080/api/v1/n/user/') as response:
-                async with session.get(self.url) as response:
-                    response.raise_for_status()  # Raise exception for bad status
-                    self.src = await response.json()  # Directly parse JSON
-                    self.start_time = time.time()  # Reset refresh timer
+                #response.raise_for_status()  # Проверка статуса
+                response=await session.get(self.url)
+                self.src = await response.json()  # Парсинг JSON
+                self.start_time = time.time()  # Обновление времени
+
         except aiohttp.ClientError as e:
             print(f"HTTP request failed: {e}")
             raise DataIsNotGot(e)
-            # You might want to keep old data or raise an exception here
         except json.JSONDecodeError as e:
             print(f"Failed to parse JSON: {e}")
             raise DataIsWrong(e)
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            raise DataIsNotGot(e)
 
 
 if __name__ == "__main__":

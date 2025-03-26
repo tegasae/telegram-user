@@ -13,6 +13,12 @@ class AbstractUnitOfWork(abc.ABC):
     def __exit__(self, *args):
         self.rollback()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.rollback()
+
     def commit(self):
         print("commit")
 
@@ -26,7 +32,10 @@ class AbstractUnitOfWork(abc.ABC):
     @abc.abstractmethod
     def rollback(self):
         print("rollback")
+        raise NotImplementedError
 
+    @abc.abstractmethod
+    def close(self):
         raise NotImplementedError
 
 
@@ -42,6 +51,9 @@ class UnitOfWork(AbstractUnitOfWork):
     def rollback(self):
         print("rollback")
 
+    def close(self):
+        print("close")
+
 
 class FakeUnitOfWork(AbstractUnitOfWork):
     def __init__(self):
@@ -52,6 +64,9 @@ class FakeUnitOfWork(AbstractUnitOfWork):
 
     def rollback(self):
         print("Fake rollback")
+
+    def close(self):
+        print("Fake close")
 
 
 class AlmostUnitOfWork(AbstractUnitOfWork):
@@ -64,13 +79,34 @@ class AlmostUnitOfWork(AbstractUnitOfWork):
     def rollback(self):
         print("Almost rollback")
 
+    def close(self):
+        print("Almost close")
+
 
 class HTTPUnitOfWork(AbstractUnitOfWork):
+    repository: HTTPRepository
+
     def __init__(self, url):
         self.repository = HTTPRepository(url)
+        self._initialized = False
+
+    async def _initialize(self):
+        """Явная инициализация"""
+        if not self._initialized:
+            await self.repository.initialize()
+            self._initialized = True
+
+    async def __aenter__(self):
+        if hasattr(self, '_initialize'):
+            await self._initialize()
+        return self
+
 
     def _commit(self):
         print("HTTP commit")
 
     def rollback(self):
         print("HTTP rollback")
+
+    def close(self):
+        print("HTTP close")
