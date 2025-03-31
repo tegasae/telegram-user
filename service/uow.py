@@ -1,5 +1,6 @@
 from __future__ import annotations
 import abc
+import sqlite3
 
 from adapters.repository import AbstractRepository, FakeRepository, AlmostRepository, HTTPRepository
 
@@ -70,8 +71,9 @@ class FakeUnitOfWork(AbstractUnitOfWork):
 
 
 class AlmostUnitOfWork(AbstractUnitOfWork):
-    def __init__(self):
-        self.repository = AlmostRepository()
+    repository:AlmostRepository
+    def __init__(self,conn:sqlite3.Connection):
+        self.repository = AlmostRepository(conn=conn)
 
     def _commit(self):
         print("Almost commit")
@@ -86,8 +88,8 @@ class AlmostUnitOfWork(AbstractUnitOfWork):
 class HTTPUnitOfWork(AbstractUnitOfWork):
     repository: HTTPRepository
 
-    def __init__(self, url):
-        self.repository = HTTPRepository(url)
+    def __init__(self, url,conn:sqlite3.Connection):
+        self.repository = HTTPRepository(url,conn=conn)
         self._initialized = False
 
     async def _initialize(self):

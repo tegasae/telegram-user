@@ -22,10 +22,14 @@ class Service:
     def get_senders(self) -> list[Sender]:
         return self.uow.repository.get_senders()
 
+    def get_sender(self,sender_id:int) -> Sender:
+        return self.uow.repository.get_sender(sender_id=sender_id)
+
+
     def get_receivers(self) -> list[Receiver]:
         return self.uow.repository.get_receivers()
 
-    def send_message(self, sender_id: int, receivers_id: list[int], message_id: int):
+    async def send_message(self, sender_id: int, receivers_id: list[int], message_id: int):
 
         message: Message = Message.empty_message()
 
@@ -33,13 +37,13 @@ class Service:
             message = self.uow.repository.get_message(message_id)
             if message_id != message.id:
                 raise MessageNotFound()
-        self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+        await self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
 
-    def send_new_message(self, sender_id: int, receivers_id: list[int], message_text: str):
+    async def send_new_message(self, sender_id: int, receivers_id: list[int], message_text: str):
         message: Message = Message(id=0, message=message_text)
-        self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+        await self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
 
-    def _send(self, sender_id: int, receivers_id: list[int], message: Message):
+    async def _send(self, sender_id: int, receivers_id: list[int], message: Message):
         receivers = []
         sender: Sender = Sender.empty_sender()
         if self.check_id(sender_id):
@@ -54,4 +58,4 @@ class Service:
                     receivers.append(receiver)
 
         aggregate = Aggregate(sender=sender, receivers=receivers, message=message)
-        self.sender_service.send(aggregate)
+        await self.sender_service.send(aggregate)

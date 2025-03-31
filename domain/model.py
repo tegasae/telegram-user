@@ -16,13 +16,15 @@ class Receiver:
 class Sender:
     id: int
     name: str
+    telegram_name:str
     telegram_id: str
+    phone:str
     api_id: int
     api_hash: str
 
     @classmethod
     def empty_sender(cls):
-        return cls(id=0, name="", telegram_id="", api_id=0, api_hash="")
+        return cls(id=0, name="", telegram_id="", api_id=0, api_hash="",telegram_name='',phone='')
 
 
 @dataclass

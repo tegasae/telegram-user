@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import json
+import sqlite3
 import time
 from abc import abstractmethod
 
@@ -95,7 +96,8 @@ class FakeRepository(AbstractRepository):
 
 
 class AlmostRepository(AbstractRepository):
-    def __init__(self):
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn=conn
         self.src_str = ('[{"id": 1, "name": "Шугуров Алексей", "status": 14, "telegram_id": "960563331", "full_name": '
                         '"Шугуров Алексей Евгеньевич", "confirmed": 2, "code": "000000018"}, {"id": 2, "name": "avo", '
                         '"status": 0, "telegram_id": "1382097657", "full_name": "Олейников Алексей Владимирович", '
@@ -213,28 +215,56 @@ class AlmostRepository(AbstractRepository):
                         'Илья", "status": 0, "telegram_id": "", "full_name": "Смагин Илья", "confirmed": 0, '
                         '"code": "УТ0000026"}]')
         self.src = json.loads(self.src_str)
+
         self.messages = {
             1: Message(id=1, message="message1"),
             2: Message(id=2, message="message2"),
         }
 
+
         self.auth_senders = {
-            '960563331': {'api_id': 28172272, 'api_hash': 'd06bd430d4b4ee0a6e9d08b2fd9d68e7'}
+            1: {'api_id': 28172272, 'api_hash': 'd06bd430d4b4ee0a6e9d08b2fd9d68e7','telegram_name':'Thisismeornotme'}
         }
 
     def get_messages(self) -> list[Message]:
-        return list(self.messages.values())
+        messages=[]
+        cursor=self.conn.execute("SELECT message_id,message FROM messages")
+        for c in cursor.fetchall():
+            messages.append(Message(id=c[0],message=c[1]))
+        return messages
+        #return list(self.messages.values())
+
+    def _fill_senders(self):
+        self.auth_senders = {}
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT user_id,api_id,api_hash,telegram_name,phone FROM senders")
+        senders = cursor.fetchall()
+
+        for s in senders:
+            self.auth_senders[s[0]] = {'api_id': s[1], 'api_hash': s[2], 'telegram_name': s[3],'phone':s[4]}
+
 
     def get_senders(self) -> list[Sender]:
+        self._fill_senders()
         senders = []
         for s in self.src:
             if (s['confirmed'] == 2) and (s['status'] & 8):
-                auth = self.auth_senders.get(s['telegram_id'], {})
-                if len(auth) == 2:
+                auth = self.auth_senders.get(s['id'], {})
+                if len(auth) != 0:
                     senders.append(
                         Sender(id=s['id'], name=s['name'], telegram_id=s['telegram_id'], api_id=auth['api_id'],
-                               api_hash=auth['api_hash']))
+                               api_hash=auth['api_hash'],telegram_name=auth['telegram_name'],phone=auth['phone']))
         return senders
+
+    def get_sender(self, sender_id: int) -> Sender:
+        self._fill_senders()
+        for s in self.src:
+            if s['id'] == sender_id:
+                auth = self.auth_senders.get(s['id'], {})
+                if len(auth) != 0:
+                    return Sender(name=s['name'], id=s['id'], telegram_id=s['telegram_id'],
+                                  api_id=auth['api_id'], api_hash=auth['api_hash'],telegram_name=auth['telegram_name'],phone=auth['phone'])
+        return Sender.empty_sender()
 
     def get_receivers(self) -> list[Receiver]:
         receivers = []
@@ -244,16 +274,14 @@ class AlmostRepository(AbstractRepository):
         return receivers
 
     def get_message(self, message_id: int) -> Message:
-        return self.messages.get(message_id, Message.empty_message())
+        cursor = self.conn.execute("SELECT message_id,message FROM messages WHERE message_id=:message_id",{'message_id':message_id})
+        m=cursor.fetchone()
+        if m is None:
+            return Message.empty_message()
+        return Message(id=m[0],message=m[1])
 
-    def get_sender(self, sender_id: int) -> Sender:
-        for s in self.src:
-            if s['id'] == sender_id:
-                auth = self.auth_senders.get(s['telegram_id'], {})
-                if len(auth) == 2:
-                    return Sender(name=s['name'], id=s['id'], telegram_id=s['telegram_id'],
-                                  api_id=auth['api_id'], api_hash=auth['api_hash'])
-        return Sender.empty_sender()
+
+
 
     def get_receiver(self, receiver_id: int) -> Receiver:
         for r in self.src:
@@ -262,26 +290,26 @@ class AlmostRepository(AbstractRepository):
         return Receiver.empty_receiver()
 
     def save_message(self, message: Message) -> Message:
-        try:
-            new_id = max(list(self.messages.keys()))
-            new_id += 1
-        except ValueError:
-            new_id = 1
-        message.id = new_id
-        self.messages[message.id] = message
+        cursor=self.conn.cursor()
+        if message.id:
+            cursor.execute("UPDATE messages SET message=:message WHERE message_id=:message_id",{"message_id":message.id,"message":message.message})
+        else:
+            cursor.execute("INSERT INTO messages (message) VALUES (:message)",
+                           {"message": message.message})
+            message.id=cursor.lastrowid
         return message
 
     def delete_message(self, message_id: int) -> bool:
-        try:
-            del (self.messages[message_id])
+        cursor=self.conn.cursor()
+        cursor.execute("DELETE FROM messages WHERE message_id=:message_id",{"message_id":message_id})
+        if cursor.rowcount>0:
             return True
-        except KeyError:
+        else:
             return False
 
-
 class HTTPRepository(AlmostRepository):
-    def __init__(self, url):
-        super().__init__()
+    def __init__(self, url,conn:sqlite3.Connection):
+        super().__init__(conn=conn)
         self.url = url
         self.src_str = ""
         self.src = []
@@ -329,5 +357,7 @@ if __name__ == "__main__":
     # print(repository.get_senders())
     # print(repository.get_receivers())
     # print(repository.get_messages())
-    repository = HTTPRepository(url='http://192.168.100.147:8080/api/v1/n/user/')
-    print(repository.src)
+    #repository = HTTPRepository(url='http://192.168.100.147:8080/api/v1/n/user/',conn=sqlite3.Connection(""))
+    repository =AlmostRepository(conn=sqlite3.Connection('../db/telegram-user.db'))
+    print(repository.get_senders())
+    print(repository.get_sender(sender_id=1))
