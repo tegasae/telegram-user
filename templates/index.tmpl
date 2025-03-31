@@ -1,1 +1,202 @@
-<b>123</b>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Форма с полями</title>
+
+    <!-- Конфигурация для разработчика -->
+    <script type="application/json" id="devConfig">
+    {
+        "serverEnabled": true,  /* true - отправка на сервер, false - локальный режим */
+        "apiUrl": "http://127.0.0.1/",
+        "debugMode": true
+    }
+    </script>
+
+    <style>
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .left-section, .middle-section, .right-section {
+            display: flex;
+            flex-direction: column;
+        }
+        textarea {
+            width: 300px;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        .small-textarea {
+            height: 80px;
+        }
+        button {
+            width: 100px;
+            padding: 5px;
+            margin-bottom: 15px;
+        }
+        .radio-list, .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        /* Стили для скрытого списка людей */
+        .people-container {
+            display: flex;
+            flex-direction: column;
+        }
+        .checkbox-list {
+            display: none; /* По умолчанию скрываем */
+            margin-top: 10px;
+        }
+        .toggle-people-btn {
+            width: 150px; /* Шире обычной кнопки */
+        }
+        /* Стиль для отладки */
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <form>
+        <div class="container">
+            <!-- Левая секция - основное textarea и кнопка -->
+            <div class="left-section">
+                <textarea id="mainTextarea" placeholder="Введите ваш текст здесь..."></textarea>
+                <button type="submit">Отправить</button>
+            </div>
+
+            <!-- Средняя секция - radiobuttons и textarea для нового сообщения -->
+            <div class="middle-section">
+                <div class="radio-list" id="radioList">
+                    <label><input type="radio" name="shortMessage" value="1" id="msg1" onchange="insertMessage('Первое сообщение')"> Первое сообщение</label>
+                    <label><input type="radio" name="shortMessage" value="2" id="msg2" onchange="insertMessage('Второе сообщение')"> Второе сообщение</label>
+                    <label><input type="radio" name="shortMessage" value="3" id="msg3" onchange="insertMessage('Третье сообщение')"> Третье сообщение</label>
+                    <label><input type="radio" name="shortMessage" value="4" id="msg4" onchange="insertMessage('Четвертое сообщение')"> Четвертое сообщение</label>
+                </div>
+
+                <textarea class="small-textarea" id="newMessage" placeholder="Введите новое сообщение..."></textarea>
+                <button type="button" onclick="saveNewMessage()">Сохранить</button>
+            </div>
+
+            <!-- Правая секция - checkbox с именами людей -->
+            <div class="right-section">
+                <div class="people-container">
+                    <button type="button" class="toggle-people-btn" onclick="togglePeopleList()">Показать получателей</button>
+                    <div class="checkbox-list" id="peopleList">
+                        <label><input type="checkbox" name="people" value="1" id="person1" checked> Иван Иванов</label>
+                        <label><input type="checkbox" name="people" value="2" id="person2" checked> Петр Петров</label>
+                        <label><input type="checkbox" name="people" value="3" id="person3" checked> Мария Сидорова</label>
+                        <label><input type="checkbox" name="people" value="4" id="person4" checked> Анна Кузнецова</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Блок отладочной информации -->
+    <div id="debugInfo" class="debug-info" style="display: none;"></div>
+
+    <script>
+        // Получаем конфиг из HTML
+        const config = JSON.parse(document.getElementById('devConfig').textContent);
+
+        // Показываем отладочную информацию если включен debugMode
+        if (config.debugMode) {
+            document.getElementById('debugInfo').style.display = 'block';
+            document.getElementById('debugInfo').textContent =
+                `Режим: ${config.serverEnabled ? 'СЕРВЕРНЫЙ' : 'ЛОКАЛЬНЫЙ'}`;
+
+            console.log('Конфигурация:', config);
+            if (!config.serverEnabled) {
+                console.warn('Серверный режим ОТКЛЮЧЕН в конфиге!');
+            }
+        }
+
+        function insertMessage(message) {
+            document.getElementById('mainTextarea').value = message;
+        }
+
+        function addMessageToRadioList(id, message) {
+            const radioList = document.getElementById('radioList');
+            const newId = 'msg' + id;
+
+            const newRadio = document.createElement('label');
+            newRadio.innerHTML = `
+                <input type="radio" name="shortMessage" value="${id}" id="${newId}"
+                       onchange="insertMessage('${message.replace(/'/g, "\\'")}')">
+                ${message}
+            `;
+
+            radioList.appendChild(newRadio);
+        }
+
+        async function saveNewMessage() {
+            const newMessage = document.getElementById('newMessage').value.trim();
+            if (newMessage === '') {
+                alert('Введите новое сообщение!');
+                return;
+            }
+
+            // Локальное добавление сообщения
+            const localId = Date.now();
+            addMessageToRadioList(localId, newMessage);
+
+            // Отправка на сервер только если включено в конфиге
+            if (config.serverEnabled) {
+                try {
+                    const response = await fetch(config.apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: newMessage })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    console.log('Сообщение сохранено на сервере с ID:', data.id);
+                    alert(`Сообщение сохранено на сервере с ID: ${data.id}`);
+
+                } catch (error) {
+                    console.error('Ошибка отправки:', error);
+                    alert('Ошибка при сохранении на сервере (сообщение сохранено локально)');
+                }
+            } else {
+                console.log('Локальное сохранение (серверный режим отключен)');
+                alert('Сообщение сохранено локально (серверный режим отключен)');
+            }
+
+            document.getElementById('newMessage').value = '';
+        }
+
+        // Функция для показа/скрытия списка людей
+        function togglePeopleList() {
+            const peopleList = document.getElementById('peopleList');
+            const toggleBtn = document.querySelector('.toggle-people-btn');
+
+            if (peopleList.style.display === 'none' || !peopleList.style.display) {
+                peopleList.style.display = 'flex';
+                toggleBtn.textContent = 'Скрыть получателей';
+            } else {
+                peopleList.style.display = 'none';
+                toggleBtn.textContent = 'Показать получателей';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -28,7 +28,6 @@ def get_uow():
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
-    print(uow)
     return templates.TemplateResponse(request=request, name="index.tmpl")
 
 
