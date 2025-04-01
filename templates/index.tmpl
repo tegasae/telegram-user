@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Форма с полями</title>
 
     <!-- Конфигурация для разработчика -->
     <script type="application/json" id="devConfig">
     {
-        "serverEnabled": true,  /* true - отправка на сервер, false - локальный режим */
+        "serverEnabled": true,
         "apiUrl": "http://127.0.0.1/",
         "debugMode": true
     }
@@ -42,7 +42,7 @@
             gap: 5px;
             margin-bottom: 10px;
         }
-        /* Стили для скрытого списка людей */
+        /* Стили для скрытых списков */
         .people-container {
             display: flex;
             flex-direction: column;
@@ -53,6 +53,15 @@
         }
         .toggle-people-btn {
             width: 150px; /* Шире обычной кнопки */
+        }
+        /* Новые стили для списка отправителей */
+        .senders-container {
+            margin-top: 20px;
+        }
+        select {
+            width: 150px;
+            padding: 5px;
+            margin-bottom: 10px;
         }
         /* Стиль для отладки */
         .debug-info {
@@ -80,10 +89,9 @@
             <!-- Средняя секция - radiobuttons и textarea для нового сообщения -->
             <div class="middle-section">
                 <div class="radio-list" id="radioList">
-                    <label><input type="radio" name="shortMessage" value="1" id="msg1" onchange="insertMessage('Первое сообщение')"> Первое сообщение</label>
-                    <label><input type="radio" name="shortMessage" value="2" id="msg2" onchange="insertMessage('Второе сообщение')"> Второе сообщение</label>
-                    <label><input type="radio" name="shortMessage" value="3" id="msg3" onchange="insertMessage('Третье сообщение')"> Третье сообщение</label>
-                    <label><input type="radio" name="shortMessage" value="4" id="msg4" onchange="insertMessage('Четвертое сообщение')"> Четвертое сообщение</label>
+                    {% for message in messages%}
+                        <label><input type="radio" name="shortMessage" value="{{message.id}}" id="{{message.id}}" onchange="insertMessage('{{message.message}}')">{{message.message}}</label>
+                    {% endfor%}
                 </div>
 
                 <textarea class="small-textarea" id="newMessage" placeholder="Введите новое сообщение..."></textarea>
@@ -95,11 +103,20 @@
                 <div class="people-container">
                     <button type="button" class="toggle-people-btn" onclick="togglePeopleList()">Показать получателей</button>
                     <div class="checkbox-list" id="peopleList">
-                        <label><input type="checkbox" name="people" value="1" id="person1" checked> Иван Иванов</label>
-                        <label><input type="checkbox" name="people" value="2" id="person2" checked> Петр Петров</label>
-                        <label><input type="checkbox" name="people" value="3" id="person3" checked> Мария Сидорова</label>
-                        <label><input type="checkbox" name="people" value="4" id="person4" checked> Анна Кузнецова</label>
+                      {% for receiver in receivers %}
+                        <label><input type="checkbox" name="receiver" value="{{receiver.id}}" id="{{receiver.id}}" checked>{{receiver.name}}</label>
+                      {% endfor %}
                     </div>
+                </div>
+
+                <!-- Новый блок для выбора отправителя -->
+                <div class="senders-container">
+                    <label for="senderSelect">Отправитель:</label>
+                    <select id="senderSelect" name="sender">
+                        {% for sender in senders %}
+                            <option value="{{sender.id}}">{{sender.name}}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
         </div>
