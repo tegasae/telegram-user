@@ -18,14 +18,14 @@ templates = Jinja2Templates(directory="templates")
 
 # async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 100):
 #    return {"q": q, "skip": skip, "limit": limit}
-def create_template(request:Request,var:dict):
+def create_template(request: Request, var: dict):
     template = templates.get_template("index.tmpl")
-
 
     # 3. Рендерим в строку (если нужно дополнительно обработать)
     html_content = template.render(var)
     # 4. Возвращаем как HTMLResponse
     return html_content
+
 
 def get_uow():
     use_fake = False
@@ -42,15 +42,20 @@ def get_uow():
 
 
 @app.get("/", response_class=HTMLResponse)
-async def read_item(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
+async def read(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
     async with uow:
         service = Service(uow=uow, sender_service=FakeSenderService())
         receivers = service.get_receivers()
         senders = service.get_senders()
-        messages=service.get_messages()
-        var={'receivers':receivers,'senders':senders,'messages':messages}
-    return HTMLResponse(content=create_template(request=request,var=var))
+        messages = service.get_messages()
+        var = {'receivers': receivers, 'senders': senders, 'messages': messages}
+    return HTMLResponse(content=create_template(request=request, var=var))
 
+
+@app.post("/", response_class=HTMLResponse)
+async def send(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
+    print(request)
+    return HTMLResponse(content="{}")
 
 
 if __name__ == "__main__":
