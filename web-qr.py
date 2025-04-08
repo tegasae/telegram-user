@@ -23,7 +23,7 @@ import qrcode
 from io import BytesIO
 import base64
 
-
+#
 qr_auth_data = {}
 
 app = FastAPI()
