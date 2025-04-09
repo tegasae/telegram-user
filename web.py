@@ -1,12 +1,13 @@
 import sqlite3
 from contextlib import asynccontextmanager, contextmanager
-from typing import Annotated
+from typing import Annotated, List, Optional
 
 import uvicorn
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, validator
 
 from adapters.sender import FakeSenderService
 from service.service import Service
@@ -14,6 +15,26 @@ from service.uow import HTTPUnitOfWork, AlmostUnitOfWork
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+class MyForm(BaseModel):
+
+    receivers: List[int]   # Список чекбоксов (может быть пустым)
+    sender:int
+    message:str
+
+
+async def get_form_data(
+    receiver: List[int] = Form(['int']),
+    sender:int=Form('int'),
+    message:str=Form('str')
+) -> MyForm:
+    return MyForm(
+        receivers=receiver,
+        sender=sender,
+        message=message
+    )
+
+
 
 
 # async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 100):
@@ -28,7 +49,7 @@ def create_template(request: Request, var: dict):
 
 
 def get_uow():
-    use_fake = False
+    use_fake = True
     conn = sqlite3.connect('./db/telegram-user.db', check_same_thread=False)  # Важно: отключаем проверку потоков
     if use_fake:
         uow = AlmostUnitOfWork(conn=conn)
@@ -53,8 +74,9 @@ async def read(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
 
 
 @app.post("/", response_class=HTMLResponse)
-async def send(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
+async def send(request: Request, uow: HTTPUnitOfWork = Depends(get_uow),form_data: MyForm = Depends(get_form_data)):
     print(request)
+    print(form_data)
     return HTMLResponse(content="{}")
 
 
