@@ -1,5 +1,6 @@
 import sqlite3
 from contextlib import asynccontextmanager, contextmanager
+from datetime import datetime
 from typing import Annotated, List, Optional
 
 import uvicorn
@@ -8,42 +9,32 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, validator
+from pyrogram import Client
+from starlette.responses import RedirectResponse
 
 from adapters.sender import FakeSenderService
 from service.service import Service
 from service.uow import HTTPUnitOfWork, AlmostUnitOfWork
+from myweb.forms import MyForm, MyFormModel, MyFormModelOutput, get_form_data
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-class MyForm(BaseModel):
+# Глобальные переменные
+pending_message = None
+auth_step = 1  # 1 - запрос кода, 2 - ввод кода, 3 - ввод пароля
 
-    receivers: List[int]   # Список чекбоксов (может быть пустым)
-    sender:int
-    message:str
-
-
-async def get_form_data(
-    receiver: List[int] = Form(['int']),
-    sender:int=Form('int'),
-    message:str=Form('str')
-) -> MyForm:
-    return MyForm(
-        receivers=receiver,
-        sender=sender,
-        message=message
-    )
+form_handler = MyForm
 
 
 
 
-# async def common_parameters(q: str | None = None, skip: int = 0, limit: int = 100):
-#    return {"q": q, "skip": skip, "limit": limit}
-def create_template(request: Request, var: dict):
+
+def create_template(request: Request, var: dict, fields: dict):
     template = templates.get_template("index.tmpl")
 
     # 3. Рендерим в строку (если нужно дополнительно обработать)
-    html_content = template.render(var)
+    html_content = template.render(var=var, fields=fields)
     # 4. Возвращаем как HTMLResponse
     return html_content
 
@@ -69,15 +60,31 @@ async def read(request: Request, uow: HTTPUnitOfWork = Depends(get_uow)):
         receivers = service.get_receivers()
         senders = service.get_senders()
         messages = service.get_messages()
+        model = MyFormModel(receivers=receivers, senders=senders, messages=messages, message="")
+        fh = form_handler(model=model)
         var = {'receivers': receivers, 'senders': senders, 'messages': messages}
-    return HTMLResponse(content=create_template(request=request, var=var))
+    return HTMLResponse(content=create_template(request=request, var=var, fields=fh.fields))
 
 
 @app.post("/", response_class=HTMLResponse)
-async def send(request: Request, uow: HTTPUnitOfWork = Depends(get_uow),form_data: MyForm = Depends(get_form_data)):
-    print(request)
+async def send(request: Request, uow: HTTPUnitOfWork = Depends(get_uow), form_data: MyFormModelOutput = Depends(get_form_data)):
     print(form_data)
-    return HTMLResponse(content="{}")
+    try:
+        # Проверяем авторизацию
+        async with (uow):
+
+            service = Service(uow=uow, sender_service=FakeSenderService())
+            sender = service.get_sender(sender_id=form_data.sender)
+            receivers = service.get_receivers()
+            ids = [receiver.id for receiver in receivers if receiver.id in form_data.receivers]
+
+            await service.send_message(sender_id=1, receivers_id=ids, message_id=1)
+    except Exception:
+        # Сохраняем сообщение и перенаправляем на авторизацию
+        pending_message = f"Сообщение 1\nДата и время: {datetime.now()}"
+        return RedirectResponse(url="/auth", status_code=303)
+
+    return HTMLResponse(content="{1}")
 
 
 if __name__ == "__main__":

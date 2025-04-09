@@ -1,10 +1,46 @@
+<!DOCTYPE html>
 <html>
 <head>
-<title>Отправить сообщение</title>
+    <title>Форма</title>
+    <script>
+        const FORM_CONFIG = {{ form_json|safe }};
+    </script>
 </head>
 <body>
-<form method="POST">
-<input type="SUBMIT" value="Отправить">
-</form>
+    <form method="post" action="/submit">
+        {% for name, field in form.fields.items() %}
+            <div class="form-group">
+                <label>{{ field.label }}{% if field.required %}*{% endif %}</label>
+
+                {% if field.field_type == "text" %}
+                    <input type="text" name="{{ name }}" required="{{ field.required }}">
+
+                {% elif field.field_type == "textarea" %}
+                    <textarea name="{{ name }}" required="{{ field.required }}"></textarea>
+
+                {% elif field.field_type == "checkbox" and field.options %}
+                    {% for value, label in field.options.items() %}
+                        <div>
+                            <input type="checkbox" name="{{ name }}" value="{{ value }}" id="{{ name }}_{{ value }}">
+                            <label for="{{ name }}_{{ value }}">{{ label }}</label>
+                        </div>
+                    {% endfor %}
+
+                {% elif field.field_type == "radio" %}
+                    {% for value, label in field.options.items() %}
+                        <div>
+                            <input type="radio" name="{{ name }}" value="{{ value }}" id="{{ name }}_{{ value }}" required="{{ field.required }}">
+                            <label for="{{ name }}_{{ value }}">{{ label }}</label>
+                        </div>
+                    {% endfor %}
+
+                {% else %}
+                    <input type="{{ field.field_type }}" name="{{ name }}" required="{{ field.required }}">
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit">Отправить</button>
+    </form>
 </body>
 </html>

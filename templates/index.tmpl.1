@@ -81,22 +81,20 @@
     {% for name, field in fields.items() %}
      {{name}}
      {{field}}
-
-
     {%endfor%}
     <form method="POST">
         <div class="container">
             <!-- Левая секция - основное textarea и кнопка -->
             <div class="left-section">
-                <textarea id="mainTextarea" name="{{fields.message.name}}" placeholder="Введите ваш текст здесь...">{{fields.message.values}}</textarea>
+                <textarea id="mainTextarea" name="message" placeholder="Введите ваш текст здесь..."></textarea>
                 <button type="submit">Отправить</button>
             </div>
 
             <!-- Средняя секция - radiobuttons и textarea для нового сообщения -->
             <div class="middle-section">
                 <div class="radio-list" id="radioList">
-                    {% for m in fields.messages.values%}
-                        <label><input type="radio" name="{{fields.messages.name}}" value="{{m.id}}" id="{{m.id}}" onchange="insertMessage('{{m.message}}')">{{m.message}}</label>
+                    {% for message in messages%}
+                        <label><input type="radio" name="shortMessage" value="{{message.id}}" id="{{message.id}}" onchange="insertMessage('{{message.message}}')">{{message.message}}</label>
                     {% endfor%}
                 </div>
 
@@ -109,8 +107,8 @@
                 <div class="people-container">
                     <button type="button" class="toggle-people-btn" onclick="togglePeopleList()">Показать получателей</button>
                     <div class="checkbox-list" id="peopleList">
-                      {% for r in fields.receivers.values %}
-                        <label><input type="checkbox" name="{{fields.receivers.name}}" value="{{r.id}}" id="{{r.id}}" checked>{{r.name}}</label>
+                      {% for receiver in receivers %}
+                        <label><input type="checkbox" name="receiver" value="{{receiver.id}}" id="{{receiver.id}}" checked>{{receiver.name}}</label>
                       {% endfor %}
                     </div>
                 </div>
@@ -118,9 +116,9 @@
                 <!-- Новый блок для выбора отправителя -->
                 <div class="senders-container">
                     <label for="senderSelect">Отправитель:</label>
-                    <select id="senderSelect" name="{{fields.senders.name}}">
-                        {% for s in fields.senders.values %}
-                            <option value="{{s.id}}">{{s.name}}</option>
+                    <select id="senderSelect" name="sender">
+                        {% for sender in senders %}
+                            <option value="{{sender.id}}">{{sender.name}}</option>
                         {% endfor %}
                     </select>
                 </div>
