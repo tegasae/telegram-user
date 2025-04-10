@@ -28,4 +28,11 @@ class DataIsWrong(CommonException):
         self.base_message = f'The data is wrong {self.m}'
 
 
+class AuthRequired(CommonException):
+    def create_message(self):
+        self.base_message = f'Auth required'
+
+
+
+
 
