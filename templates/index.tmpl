@@ -78,20 +78,27 @@
     </style>
 </head>
 <body>
-
+    {% if events|length!=0 %}
+        {%for e in events%}
+        <div class="alert alert-danger">
+            {%if e.number==1%}Сообщение отправлено{%endif%}
+            {%if e.number==2%}Сообщение не может быть пустым{%endif%}
+        </div>
+        {%endfor%}
+    {% endif %}
     <form method="POST">
         <div class="container">
             <!-- Левая секция - основное textarea и кнопка -->
             <div class="left-section">
-                <textarea id="mainTextarea" name="{{fields.message.name}}" placeholder="Введите ваш текст здесь...">{{fields.message.values}}</textarea>
+                <textarea id="mainTextarea" name="{{form.value_field.message}}" placeholder="Введите ваш текст здесь...">{{form.message.message}}</textarea>
                 <button type="submit">Отправить</button>
             </div>
 
             <!-- Средняя секция - radiobuttons и textarea для нового сообщения -->
             <div class="middle-section">
                 <div class="radio-list" id="radioList">
-                    {% for m in fields.messages.values%}
-                        <label><input type="radio" name="{{fields.messages.name}}" value="{{m.id}}" id="{{m.id}}" onchange="insertMessage('{{m.message}}')">{{m.message}}</label>
+                    {% for m in form.messages%}
+                        <label><input type="radio" name="{{form.value_field.messages}}" value="{{m.id}}" id="{{m.id}}" onchange="insertMessage('{{m.message}}')">{{m.message}}</label>
                     {% endfor%}
                 </div>
 
@@ -104,8 +111,8 @@
                 <div class="people-container">
                     <button type="button" class="toggle-people-btn" onclick="togglePeopleList()">Показать получателей</button>
                     <div class="checkbox-list" id="peopleList">
-                      {% for r in fields.receivers.values %}
-                        <label><input type="checkbox" name="{{fields.receivers.name}}" value="{{r.id}}" id="{{r.id}}" checked>{{r.name}}</label>
+                      {% for r in form.receivers %}
+                        <label><input type="checkbox" name="{{form.value_field.receivers}}" value="{{r.id}}" id="{{r.id}}" checked>{{r.name}}</label>
                       {% endfor %}
                     </div>
                 </div>
@@ -113,8 +120,8 @@
                 <!-- Новый блок для выбора отправителя -->
                 <div class="senders-container">
                     <label for="senderSelect">Отправитель:</label>
-                    <select id="senderSelect" name="{{fields.senders.name}}">
-                        {% for s in fields.senders.values %}
+                    <select id="senderSelect" name="{{form.value_field.senders}}">
+                        {% for s in form.senders %}
                             <option value="{{s.id}}">{{s.name}}</option>
                         {% endfor %}
                     </select>
