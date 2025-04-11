@@ -13,7 +13,7 @@ bot = Client(name=LOGIN,
 
 
 bot.start()
-bot.send_message(chat_id='obukhovrn', text='Нет, это не я набирал')
+bot.send_message(chat_id='me', text='Нет, это не я набирал')
 bot.stop()
 
 

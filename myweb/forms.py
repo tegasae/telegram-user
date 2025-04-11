@@ -1,7 +1,7 @@
-from fastapi import Form
-from pydantic import BaseModel, field_validator
-from typing import List, Dict, Any, Type
-from enum import Enum
+from fastapi import Form, HTTPException
+from pydantic import BaseModel, field_validator, ValidationError
+from typing import List, Dict, Any
+
 
 from domain.model import Sender, Receiver, Message
 
@@ -16,40 +16,73 @@ class FormField:
         self.values=values
 
 
-class MyFormModel(BaseModel):
+class MyFormModelOutput(BaseModel):
     senders: List[Sender]
     receivers:List[Receiver]
     messages: List[Message]
-    message:str
+    message:str=""
 
-    #@field_validator('interests')
+
     #@classmethod
+    #@field_validator('senders')
     #def validate_interests(cls, v: List[str]) -> List[str]:
     #    if not v:
     #        raise ValueError("Должен быть выбран хотя бы один интерес")
     #    return v
 
 
-class MyFormModelOutput(BaseModel):
+class MyFormModelInput(BaseModel):
     sender: int
     receivers: List[int]
-    message: str
+    message: str  # Обязательное поле
+
+    @field_validator('sender')
+    @classmethod
+    def validate_sender(cls, v: int) -> int:
+        if type(v) is not int and v<=0:
+            raise ValueError("Должно быть больше 0")
+        return v
+
+    @field_validator('message')
+    @classmethod
+    def validate_message_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Сообщение не может быть пустым")
+        return v.strip()
+
+    @field_validator('receivers')
+    @classmethod
+    def validate_receivers_not_empty(cls, v: List[int]) -> List[int]:
+        if not v:
+            raise ValueError("Должен быть выбран хотя бы один получатель")
+        return v
 
 
 async def get_form_data(
-        message: str = Form(str),
-        receivers: List[int] = Form([int]),
-        senders: str = Form(str)
-) -> MyFormModelOutput:
-    return MyFormModelOutput(
-        message=message,
-        receivers=receivers,
-        sender=senders
-    )
+    sender: int = Form(..., alias="senders"),
+    receivers: List[int] = Form([]),
+    message: str = Form(...)
+) -> MyFormModelInput:
+    try:
+        return MyFormModelInput(
+            sender=sender,
+            receivers=receivers,
+            message=message
+        )
+    except ValidationError as e:
+        # Берем первое сообщение об ошибке
+        first_error = e.errors()[0]
+        field = first_error['loc'][0]
+        msg = first_error['msg']
+        error_msg = f"Ошибка в поле '{field}': {msg}"
+        raise HTTPException(status_code=400, detail=error_msg)
+    except ValueError as e:
+        error_msg = f"Ошибка в данных: {str(e)}"
+        raise HTTPException(status_code=400, detail=error_msg)
 
 
 class MyForm:
-    def __init__(self,model:MyFormModel):
+    def __init__(self, model:MyFormModelOutput):
         self.model = model
         self.fields = {
             "senders": FormField("checkbox", "Имя отправителей",name="senders", values=model.senders),
@@ -60,3 +93,6 @@ class MyForm:
 
     #def get_form_data(self, **kwargs):
     #    return self.model(**kwargs)
+
+if __name__=="__main__":
+    mf=MyFormModelInput(sender=1,receivers=[],message="")

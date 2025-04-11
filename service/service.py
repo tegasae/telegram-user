@@ -43,6 +43,16 @@ class Service:
         message: Message = Message(id=0, message=message_text)
         await self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
 
+    async def auth(self,sender_id: int,*args,**kwargs)->bool:
+        sender: Sender = Sender.empty_sender()
+        if self.check_id(sender_id):
+            sender = self.uow.repository.get_sender(sender_id=sender_id)
+            if sender_id != sender.id:
+                raise SenderNotFound()
+
+        r= await self.sender_service.auth(sender,phone_code=kwargs['phone_code'],password=kwargs['password'])
+        return r
+
     async def _send(self, sender_id: int, receivers_id: list[int], message: Message):
         receivers = []
         sender: Sender = Sender.empty_sender()
