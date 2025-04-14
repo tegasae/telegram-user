@@ -78,11 +78,13 @@
     </style>
 </head>
 <body>
-    {% if events|length!=0 %}
-        {%for e in events%}
+    {{current_events}}
+    {% if current_events|length!=0 %}
+        {%for e in current_events%}
         <div class="alert alert-danger">
-            {%if e.number==1%}Сообщение отправлено{%endif%}
-            {%if e.number==2%}Сообщение не может быть пустым{%endif%}
+            {%if e==1%}Сообщение отправлено{%endif%}
+            {%if e==2%}Сообщение не может быть пустым{%endif%}
+            {%if e==3%}Должен быть выбран хотя бы один получатель{%endif%}
         </div>
         {%endfor%}
     {% endif %}
