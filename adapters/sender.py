@@ -5,7 +5,9 @@ from domain.exceptions import AuthRequired
 from domain.model import Aggregate, Sender
 from pyrogram import Client
 from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid
+
 logger = logging.getLogger(__name__)
+
 
 class AbstractSenderService(abc.ABC):
     @abc.abstractmethod
@@ -13,20 +15,37 @@ class AbstractSenderService(abc.ABC):
         raise NotImplemented
 
     @abc.abstractmethod
-    async def auth(self,*args,**kwargs)->bool:
+    async def get_number(self, sender: Sender) -> str:
         raise NotImplemented
+
+    @abc.abstractmethod
+    async def auth(self, *args, **kwargs) -> bool:
+        raise NotImplemented
+
 
 class FakeSenderService(AbstractSenderService):
     async def send(self, aggregate: Aggregate):
-        print(aggregate.sender.name)
-        print(aggregate.message.message)
-        for r in aggregate.receivers:
-            print(r.name)
-            print(r.id)
-            print(" ")
+        require_auth = True
 
-    async def auth(self,*args,**kwargs)->bool:
-        return True
+        if not require_auth:
+            print(aggregate.sender.name)
+            print(aggregate.message.message)
+
+            for r in aggregate.receivers:
+                print(r.name)
+                print(r.id)
+                print(" ")
+        else:
+            raise AuthRequired()
+
+    async def get_number(self, sender: Sender) -> str:
+        return "123"
+
+    async def auth(self, *args, **kwargs) -> bool:
+        if kwargs['phone_code'] == kwargs['code']:
+            return True
+        else:
+            return False
 
 
 class SenderService(AbstractSenderService):
@@ -37,15 +56,15 @@ class SenderService(AbstractSenderService):
         PHONE = '+79204695225'
         LOGIN = 'Thisismeornotme'
 
-        #client = Client(name=aggregate.sender.telegram_name,
-        #                api_id=aggregate.sender.api_id,
-        #                api_hash=aggregate.sender.api_hash,
-        #                phone_number=aggregate.sender.phone)
+        client = Client(name=aggregate.sender.telegram_name,
+                        api_id=aggregate.sender.api_id,
+                        api_hash=aggregate.sender.api_hash,
+                        phone_number=aggregate.sender.phone)
 
-        client = Client(name=LOGIN,
-                        api_id=API_ID,
-                        api_hash=API_HASH,
-                        phone_number=PHONE)
+        # client = Client(name=LOGIN,
+        #                api_id=API_ID,
+        #                api_hash=API_HASH,
+        #                phone_number=PHONE)
 
         try:
             # Подключаемся и получаем статус авторизации
@@ -55,22 +74,8 @@ class SenderService(AbstractSenderService):
                 logger.info("Требуется авторизация")
 
                 # Отправляем код
-                sent_code = await client.send_code(client.phone_number)
                 raise AuthRequired()
-                #phone_code = input("Введите код из Telegram: ")
-
-                try:
-                    await client.sign_in(
-                        phone_number=client.phone_number,
-                        phone_code_hash=sent_code.phone_code_hash,
-                        phone_code=phone_code
-                    )
-                except SessionPasswordNeeded:
-                    password = input("Введите пароль 2FA: ")
-                    await client.check_password(password)
-                except PhoneCodeInvalid:
-                    logger.error("Неверный код!")
-                    return
+                # phone_code = input("Введите код из Telegram: ")
 
             # Проверяем подключение (дополнительная страховка)
             if client.is_connected:
@@ -78,28 +83,45 @@ class SenderService(AbstractSenderService):
                 logger.info("Сообщение отправлено в Избранное!")
             else:
                 logger.error("Нет подключения к серверу")
-
-
         finally:
             if client.is_connected:
                 await client.disconnect()
 
-    async def auth(self,sender:Sender,phone_code:str,password:str) ->bool:
+    async def get_number(self, sender: Sender) -> str:
+        client = Client(name=sender.telegram_name,
+                        api_id=sender.api_id,
+                        api_hash=sender.api_hash,
+                        phone_number=sender.phone)
+        is_authorized = await client.connect()
 
-        async with Client(name=sender.name,api_id=sender.api_id, api_hash=sender.api_hash,
-                          phone_number=sender.phone) as client:
-            try:
-                await client.connect()
-                if await client.is_connected():
-                    return True
-                sent_code = await client.send_code(client.phone_number)
-                try:
-                    signed_in = await client.sign_in(client.phone_number, sent_code.phone_code_hash, phone_code)
-                except SessionPasswordNeeded as e:
-                    await client.check_password(password)
-                return True
-            except AuthRequired as e:
-                return False
+        sent_code = await client.send_code(client.phone_number)
+        if client.is_connected:
+            await client.disconnect()
+        return sent_code.phone_code_hash
 
-            finally:
+    async def auth(self, sender: Sender, *args, **kwargs) -> bool:
+
+        client = Client(name=sender.telegram_name,
+                        api_id=sender.api_id,
+                        api_hash=sender.api_hash,
+                        phone_number=sender.phone
+
+                        )
+        #phone_code = kwargs['phone_code'],
+        #password = kwargs['password']
+
+        try:
+            is_auth=await client.connect()
+            signed_in = await client.sign_in(sender.phone,kwargs['code'],phone_code=kwargs['phone_code'])
+
+        except SessionPasswordNeeded as e:
+            await client.check_password(kwargs['password'])
+            return True
+        finally:
+            if client.is_connected:
                 await client.disconnect()
+
+        if signed_in is True:
+            return True
+        else:
+            return False

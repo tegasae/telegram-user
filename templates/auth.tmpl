@@ -24,8 +24,11 @@
         <div class="error">{{ error }}</div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" >
+                <input type="hidden" id="number" name="number" value="{{number}}" required>
+                <input type="hidden" id="sender" name="sender_id" value="{{sender_id}}" required>
             <div>
+
                 <label for="phone_code">Код подтверждения:</label>
                 <input type="text" id="phone_code" name="phone_code" required>
             </div>
