@@ -2,6 +2,7 @@ import sqlite3
 from typing import List
 
 import uvicorn
+from aiohttp.web_exceptions import HTTPError, HTTPMethodNotAllowed, HTTPNotAcceptable
 from fastapi import FastAPI, Request, Depends, Form, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -57,7 +58,7 @@ def get_sender_service() -> AbstractSenderService:
 
 @app.get("/", response_class=HTMLResponse)
 async def read(request: Request, events: str = Query(default=None, description="Must be integer"),
-               uow: HTTPUnitOfWork = Depends(get_uow)):
+               uow: HTTPUnitOfWork = Depends(get_uow),sender_service=Depends(get_sender_service)):
     try:
         list_of_events: List[int] = [int(events)]
     except ValueError:
@@ -65,7 +66,7 @@ async def read(request: Request, events: str = Query(default=None, description="
     except TypeError:
         list_of_events: List[int] = []
 
-    service = Service(uow=uow, sender_service=FakeSenderService())
+    service = Service(uow=uow, sender_service=get_sender_service())
 
     receivers = service.get_receivers()
     senders = service.get_senders()
@@ -81,7 +82,8 @@ async def send(
         uow: HTTPUnitOfWork = Depends(get_uow),
         sender: int = Form(..., alias="senders"),
         receivers: List[int] = Form([]),
-        message: str = Form(...)
+        message: str = Form(...),
+        sender_service=Depends(get_sender_service)
 ):
     try:
         form_data = MyFormModelInput(
@@ -89,7 +91,7 @@ async def send(
             receivers=receivers,
             message=message
         )
-        service = Service(uow=uow, sender_service=FakeSenderService())
+        service = Service(uow=uow, sender_service=get_sender_service())
         await service.send_new_message(
             sender_id=form_data.sender,
             receivers_id=form_data.receivers,
@@ -117,10 +119,11 @@ async def send(
             status_code=303
         )
     except AuthRequired:
-        return RedirectResponse(
-            url=f"/auth?sender_id={sender}",
-            status_code=303
-        )
+        raise HTTPNotAcceptable()
+        #return RedirectResponse(
+        #    url=f"/auth?sender_id={sender}",
+        #    status_code=303
+        #)
     except Exception as e:
         # Логирование для разработчика
         print(f"Unhandled error: {str(e)}")
@@ -156,13 +159,6 @@ async def process_auth(
         return RedirectResponse(url="/", status_code=303)
     else:
         return RedirectResponse(url="/123", status_code=303)
-
-# @app.exception_handler(FormValidationError)
-# async def form_validation_exception_handler(request: Request, exc: FormValidationError):
-#    return RedirectResponse(
-#        url=f"/global_handler_error",
-#        status_code=303
-#    )
 
 
 if __name__ == "__main__":

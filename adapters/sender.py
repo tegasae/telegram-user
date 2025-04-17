@@ -79,8 +79,15 @@ class SenderService(AbstractSenderService):
 
             # Проверяем подключение (дополнительная страховка)
             if client.is_connected:
-                await client.send_message("me", "Тестовое сообщение")
-                logger.info("Сообщение отправлено в Избранное!")
+                for r in aggregate.receivers:
+                    try:
+                        await client.send_message(int(r.telegram_id), aggregate.message.message)
+                        logger.info("Сообщение отправлено в Избранное!")
+                    except Exception as e:
+                        print(e)
+                        continue
+
+
             else:
                 logger.error("Нет подключения к серверу")
         finally:
