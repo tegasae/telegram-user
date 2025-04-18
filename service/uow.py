@@ -92,6 +92,7 @@ class HTTPUnitOfWork(AbstractUnitOfWork):
         self.repository = HTTPRepository(url,conn=conn)
         self._initialized = False
 
+
     async def _initialize(self):
         """Явная инициализация"""
         if not self._initialized:

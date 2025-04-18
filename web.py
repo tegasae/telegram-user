@@ -33,13 +33,14 @@ def create_template(request: Request, var: dict, form: MyFormModelOutput, events
 
 
 def get_uow():
-    use_fake = True
+    use_fake = False
     conn = sqlite3.connect('./db/telegram-user.db', check_same_thread=False)  # Важно: отключаем проверку потоков
     if use_fake:
         uow = AlmostUnitOfWork(conn=conn)
     else:
         uow = HTTPUnitOfWork(url='http://192.168.100.147:8080/api/v1/n/user/', conn=conn)
     try:
+
         yield uow
     finally:
         conn.close()
@@ -68,9 +69,9 @@ async def read(request: Request, events: str = Query(default=None, description="
 
     service = Service(uow=uow, sender_service=get_sender_service())
 
-    receivers = service.get_receivers()
-    senders = service.get_senders()
-    messages = service.get_messages()
+    receivers = await service.get_receivers()
+    senders = await service.get_senders()
+    messages = await service.get_messages()
     model = MyFormModelOutput(receivers=receivers, senders=senders, messages=messages, message="")
     content = create_template(request=request, var={}, form=model, events=list_of_events)
     return HTMLResponse(content=content)
@@ -162,4 +163,4 @@ async def process_auth(
 
 
 if __name__ == "__main__":
-    uvicorn.run("web:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("web:app", host="0.0.0.0", port=8000, reload=True)

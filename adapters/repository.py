@@ -13,8 +13,13 @@ from domain.model import Message, Sender, Receiver
 
 class AbstractRepository(abc.ABC):
     @abstractmethod
+    def initialize(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def get_messages(self) -> list[Message]:
         raise NotImplementedError
+
 
     @abstractmethod
     def get_senders(self) -> list[Sender]:
@@ -46,6 +51,9 @@ class AbstractRepository(abc.ABC):
 
 
 class FakeRepository(AbstractRepository):
+    def initialize(self):
+        print('initialize')
+
     def __init__(self):
         self.senders = {1: Sender(id=1, name="sender1", telegram_id="telegram1", api_id=1, api_hash="hash1"),
                         2: Sender(id=2, name="sender2", telegram_id="telegram2", api_id=1, api_hash="hash2")
@@ -96,8 +104,11 @@ class FakeRepository(AbstractRepository):
 
 
 class AlmostRepository(AbstractRepository):
+    def initialize(self):
+        print('initialize')
+
     def __init__(self, conn: sqlite3.Connection):
-        self.conn=conn
+        self.conn = conn
         self.src_str = ('[{"id": 1, "name": "Шугуров Алексей", "status": 14, "telegram_id": "960563331", "full_name": '
                         '"Шугуров Алексей Евгеньевич", "confirmed": 2, "code": "000000018"}, {"id": 2, "name": "avo", '
                         '"status": 0, "telegram_id": "1382097657", "full_name": "Олейников Алексей Владимирович", '
@@ -221,28 +232,28 @@ class AlmostRepository(AbstractRepository):
             2: Message(id=2, message="message2"),
         }
 
-
         self.auth_senders = {
-            1: {'api_id': 28172272, 'api_hash': 'd06bd430d4b4ee0a6e9d08b2fd9d68e7','telegram_name':'Thisismeornotme'}
+            1: {'api_id': 28172272, 'api_hash': 'd06bd430d4b4ee0a6e9d08b2fd9d68e7', 'telegram_name': 'Thisismeornotme'}
         }
 
     def get_messages(self) -> list[Message]:
-        messages=[]
-        cursor=self.conn.execute("SELECT message_id,message FROM messages")
+        messages = []
+        cursor = self.conn.execute("SELECT message_id,message FROM messages")
         for c in cursor.fetchall():
-            messages.append(Message(id=c[0],message=c[1]))
+            messages.append(Message(id=c[0], message=c[1]))
         return messages
-        #return list(self.messages.values())
+        # return list(self.messages.values())
 
     def _fill_senders(self):
         self.auth_senders = {}
         cursor = self.conn.cursor()
-        cursor.execute("SELECT user_id,api_id,api_hash,telegram_name,phone FROM senders")
+        cursor.execute("SELECT user_id,api_id,api_hash,telegram_name,phone FROM senders ORDER BY user_id DESC")
         senders = cursor.fetchall()
 
         for s in senders:
-            self.auth_senders[s[0]] = {'api_id': s[1], 'api_hash': s[2], 'telegram_name': s[3],'phone':s[4]}
-
+            if s[0]==1:
+                continue
+            self.auth_senders[s[0]] = {'api_id': s[1], 'api_hash': s[2], 'telegram_name': s[3], 'phone': s[4]}
 
     def get_senders(self) -> list[Sender]:
         self._fill_senders()
@@ -253,7 +264,7 @@ class AlmostRepository(AbstractRepository):
                 if len(auth) != 0:
                     senders.append(
                         Sender(id=s['id'], name=s['name'], telegram_id=s['telegram_id'], api_id=auth['api_id'],
-                               api_hash=auth['api_hash'],telegram_name=auth['telegram_name'],phone=auth['phone']))
+                               api_hash=auth['api_hash'], telegram_name=auth['telegram_name'], phone=auth['phone']))
         return senders
 
     def get_sender(self, sender_id: int) -> Sender:
@@ -263,7 +274,8 @@ class AlmostRepository(AbstractRepository):
                 auth = self.auth_senders.get(s['id'], {})
                 if len(auth) != 0:
                     return Sender(name=s['name'], id=s['id'], telegram_id=s['telegram_id'],
-                                  api_id=auth['api_id'], api_hash=auth['api_hash'],telegram_name=auth['telegram_name'],phone=auth['phone'])
+                                  api_id=auth['api_id'], api_hash=auth['api_hash'], telegram_name=auth['telegram_name'],
+                                  phone=auth['phone'])
         return Sender.empty_sender()
 
     def get_receivers(self) -> list[Receiver]:
@@ -274,14 +286,12 @@ class AlmostRepository(AbstractRepository):
         return receivers
 
     def get_message(self, message_id: int) -> Message:
-        cursor = self.conn.execute("SELECT message_id,message FROM messages WHERE message_id=:message_id",{'message_id':message_id})
-        m=cursor.fetchone()
+        cursor = self.conn.execute("SELECT message_id,message FROM messages WHERE message_id=:message_id",
+                                   {'message_id': message_id})
+        m = cursor.fetchone()
         if m is None:
             return Message.empty_message()
-        return Message(id=m[0],message=m[1])
-
-
-
+        return Message(id=m[0], message=m[1])
 
     def get_receiver(self, receiver_id: int) -> Receiver:
         for r in self.src:
@@ -290,25 +300,27 @@ class AlmostRepository(AbstractRepository):
         return Receiver.empty_receiver()
 
     def save_message(self, message: Message) -> Message:
-        cursor=self.conn.cursor()
+        cursor = self.conn.cursor()
         if message.id:
-            cursor.execute("UPDATE messages SET message=:message WHERE message_id=:message_id",{"message_id":message.id,"message":message.message})
+            cursor.execute("UPDATE messages SET message=:message WHERE message_id=:message_id",
+                           {"message_id": message.id, "message": message.message})
         else:
             cursor.execute("INSERT INTO messages (message) VALUES (:message)",
                            {"message": message.message})
-            message.id=cursor.lastrowid
+            message.id = cursor.lastrowid
         return message
 
     def delete_message(self, message_id: int) -> bool:
-        cursor=self.conn.cursor()
-        cursor.execute("DELETE FROM messages WHERE message_id=:message_id",{"message_id":message_id})
-        if cursor.rowcount>0:
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM messages WHERE message_id=:message_id", {"message_id": message_id})
+        if cursor.rowcount > 0:
             return True
         else:
             return False
 
+
 class HTTPRepository(AlmostRepository):
-    def __init__(self, url,conn:sqlite3.Connection):
+    def __init__(self, url, conn: sqlite3.Connection):
         super().__init__(conn=conn)
         self.url = url
         self.src_str = ""
@@ -318,7 +330,6 @@ class HTTPRepository(AlmostRepository):
         self.delta_time = 1
 
         self._session = None
-
 
     async def initialize(self):
         """Инициализация, которую нужно вызывать явно"""
@@ -331,13 +342,13 @@ class HTTPRepository(AlmostRepository):
 
     async def _get_data_http(self):
         try:
-            #if not self._session:
+            # if not self._session:
             #    self._session = aiohttp.ClientSession()
 
-            #async with self._session.get(self.url) as response:
+            # async with self._session.get(self.url) as response:
             async with aiohttp.ClientSession() as session:
-                #response.raise_for_status()  # Проверка статуса
-                response=await session.get(self.url)
+                # response.raise_for_status()  # Проверка статуса
+                response = await session.get(self.url)
                 self.src = await response.json()  # Парсинг JSON
                 self.start_time = time.time()  # Обновление времени
 
@@ -351,13 +362,37 @@ class HTTPRepository(AlmostRepository):
             print(f"Unexpected error: {e}")
             raise DataIsNotGot(e)
 
+    def get_senders(self) -> list[Sender]:
+        self._fill_senders()
+        senders = []
+        for s in self.src:
+            if (s['confirmed'] == 2) and (s['status'] & 8):
+                auth = self.auth_senders.get(s['id'], {})
+                if len(auth) != 0:
+                    senders.append(
+                        Sender(id=s['id'], name=s['name'], telegram_id=s['telegram_id'], api_id=auth['api_id'],
+                               api_hash=auth['api_hash'], telegram_name=auth['telegram_name'], phone=auth['phone']))
+        return senders
+
+    def get_sender(self, sender_id: int) -> Sender:
+        self._fill_senders()
+        for s in self.src:
+            if s['id'] == sender_id:
+                auth = self.auth_senders.get(s['id'], {})
+                if len(auth) != 0:
+                    return Sender(name=s['name'], id=s['id'], telegram_id=s['telegram_id'],
+                                  api_id=auth['api_id'], api_hash=auth['api_hash'], telegram_name=auth['telegram_name'],
+                                  phone=auth['phone'])
+        return Sender.empty_sender()
+
+
 
 if __name__ == "__main__":
     # repository = AlmostRepository()
     # print(repository.get_senders())
     # print(repository.get_receivers())
     # print(repository.get_messages())
-    #repository = HTTPRepository(url='http://192.168.100.147:8080/api/v1/n/user/',conn=sqlite3.Connection(""))
-    repository =AlmostRepository(conn=sqlite3.Connection('../db/telegram-user.db'))
+    # repository = HTTPRepository(url='http://192.168.100.147:8080/api/v1/n/user/',conn=sqlite3.Connection(""))
+    repository = AlmostRepository(conn=sqlite3.Connection('../db/telegram-user.db'))
     print(repository.get_senders())
     print(repository.get_sender(sender_id=1))

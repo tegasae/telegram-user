@@ -3,3 +3,8 @@ api_id 28172272
 api_hash d06bd430d4b4ee0a6e9d08b2fd9d68e7
 my application
 myapp1
+
+
+Ангелина
+api_id: 22055896
+api_hash: 012b8eaca5a72fe8db2b69d9a1dcf3a5
