@@ -58,6 +58,8 @@ async def read(request: Request, events: str = Query(default=None, description="
                uow: HTTPUnitOfWork = Depends(get_uow), sender_service=Depends(get_sender_service)):
 
     sender_cookie = request.cookies.get("sender", "")
+    api_hash_cookie=request.cookies.get("api_hash","")
+
     try:
         sender_cookie=int(sender_cookie)
     except (TypeError,ValueError):
@@ -76,7 +78,7 @@ async def read(request: Request, events: str = Query(default=None, description="
     senders = await service.get_senders()
     messages = await service.get_messages()
     model = MyFormModelOutput(receivers=receivers, senders=senders, messages=messages, message="")
-    content = create_template(request=request, var={"set_sender":sender_cookie}, form=model, events=list_of_events)
+    content = create_template(request=request, var={"set_sender":sender_cookie,"api_hash":api_hash_cookie}, form=model, events=list_of_events)
     return HTMLResponse(content=content)
 
 
@@ -84,24 +86,40 @@ async def read(request: Request, events: str = Query(default=None, description="
 async def send(
         request: Request,
         uow: HTTPUnitOfWork = Depends(get_uow),
-        sender: int = Form(..., alias="senders"),
+        sender_id: int = Form(..., alias="senders"),
         receivers: List[int] = Form([]),
         message: str = Form(...),
+        api_hash: str = Form(...),
         sender_service=Depends(get_sender_service)
 ):
     set_sender=0
-    if sender:
-        set_sender = sender
+    set_api_hash=api_hash
+    sender_cookie = request.cookies.get("sender", "")
+    api_hash_cookie = request.cookies.get("api_hash", "")
+    try:
+        sender_cookie = int(sender_cookie)
+    except (TypeError, ValueError):
+        sender_cookie = 0
+
+
+    if sender_id:
+        set_sender = sender_id
     error=0
     try:
         form_data = MyFormModelInput(
-            sender=sender,
+            sender=sender_id,
             receivers=receivers,
             message=message
         )
         service = Service(uow=uow, sender_service=sender_service)
+        sender = await service.get_sender(sender_id=form_data.sender)
+
+        if sender_cookie != sender_id and api_hash_cookie == api_hash:
+            set_api_hash = ""
+
+        sender.api_hash=set_api_hash
         await service.send_new_message(
-            sender_id=form_data.sender,
+            sender_id=sender_id,
             receivers_id=form_data.receivers,
             message_text=form_data.message
         )
@@ -149,6 +167,7 @@ async def send(
     finally:
         response = RedirectResponse(url=f"/?events={error}", status_code=303)
         response.set_cookie(key="sender", value=str(set_sender), max_age=360000, expires=360000)
+        response.set_cookie(key="api_hash", value=set_api_hash, max_age=360000, expires=360000)
         return response
 
 @app.get("/auth")

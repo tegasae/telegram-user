@@ -128,6 +128,8 @@
                             <option value="{{s.id}}" {%if s.id==var.set_sender%}selected{%endif%}>{{s.name}}</option>
                         {% endfor %}
                     </select>
+                    <br>
+                    <input type="text" name="api_hash" value="{{var.api_hash}}" size="50">
                 </div>
             </div>
         </div>
