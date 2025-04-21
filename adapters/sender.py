@@ -25,7 +25,7 @@ class AbstractSenderService(abc.ABC):
 
 class FakeSenderService(AbstractSenderService):
     async def send(self, aggregate: Aggregate):
-        require_auth = True
+        require_auth = False
 
         if not require_auth:
             print(aggregate.sender.name)

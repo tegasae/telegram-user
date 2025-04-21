@@ -18,10 +18,6 @@ from service.uow import HTTPUnitOfWork, AlmostUnitOfWork
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
-# Глобальные переменные
-pending_message: MyFormModelInput
-auth_step = 1  # 1 - запрос кода, 2 - ввод кода, 3 - ввод пароля
-
 
 def create_template(request: Request, var: dict, form: MyFormModelOutput, events: list):
     template = templates.get_template("index.tmpl")
@@ -48,7 +44,7 @@ def get_uow():
 
 
 def get_sender_service() -> AbstractSenderService:
-    use_fake = False
+    use_fake = True
 
     if use_fake:
         sender_service = FakeSenderService()
@@ -59,7 +55,14 @@ def get_sender_service() -> AbstractSenderService:
 
 @app.get("/", response_class=HTMLResponse)
 async def read(request: Request, events: str = Query(default=None, description="Must be integer"),
-               uow: HTTPUnitOfWork = Depends(get_uow),sender_service=Depends(get_sender_service)):
+               uow: HTTPUnitOfWork = Depends(get_uow), sender_service=Depends(get_sender_service)):
+
+    sender_cookie = request.cookies.get("sender", "")
+    try:
+        sender_cookie=int(sender_cookie)
+    except (TypeError,ValueError):
+        sender_cookie=0
+
     try:
         list_of_events: List[int] = [int(events)]
     except ValueError:
@@ -67,13 +70,13 @@ async def read(request: Request, events: str = Query(default=None, description="
     except TypeError:
         list_of_events: List[int] = []
 
-    service = Service(uow=uow, sender_service=get_sender_service())
+    service = Service(uow=uow, sender_service=sender_service)
 
     receivers = await service.get_receivers()
     senders = await service.get_senders()
     messages = await service.get_messages()
     model = MyFormModelOutput(receivers=receivers, senders=senders, messages=messages, message="")
-    content = create_template(request=request, var={}, form=model, events=list_of_events)
+    content = create_template(request=request, var={"set_sender":sender_cookie}, form=model, events=list_of_events)
     return HTMLResponse(content=content)
 
 
@@ -86,20 +89,28 @@ async def send(
         message: str = Form(...),
         sender_service=Depends(get_sender_service)
 ):
+    set_sender=0
+    if sender:
+        set_sender = sender
+    error=0
     try:
         form_data = MyFormModelInput(
             sender=sender,
             receivers=receivers,
             message=message
         )
-        service = Service(uow=uow, sender_service=get_sender_service())
+        service = Service(uow=uow, sender_service=sender_service)
         await service.send_new_message(
             sender_id=form_data.sender,
             receivers_id=form_data.receivers,
             message_text=form_data.message
         )
         error = 1
-        return RedirectResponse(url=f"/?events={error}", status_code=303)
+        set_sender=form_data.sender
+        #response=RedirectResponse(url=f"/?events={error}", status_code=303)
+        #response.set_cookie(key="sender", value=str(form_data.sender),max_age=360000, expires=360000)
+
+        #return response
 
     except ValidationError as e:
         first_error = e.errors()[0]
@@ -115,28 +126,34 @@ async def send(
 
         field = first_error['loc'][0]
         msg = first_error['msg']
-        return RedirectResponse(
-            url=f"/?events={error}",
-            status_code=303
-        )
-    except AuthRequired:
-        raise HTTPNotAcceptable()
         #return RedirectResponse(
-        #    url=f"/auth?sender_id={sender}",
+        #    url=f"/?events={error}",
         #    status_code=303
         #)
+    except AuthRequired:
+        error=5
+        raise HTTPNotAcceptable()
+
+        # return RedirectResponse(
+        #    url=f"/auth?sender_id={sender}",
+        #    status_code=303
+        # )
     except Exception as e:
         # Логирование для разработчика
         print(f"Unhandled error: {str(e)}")
         error = 5
-        return RedirectResponse(
-            url=f"/?events={error}",
-            status_code=303
-        )
-
+        #return RedirectResponse(
+        #    url=f"/?events={error}",
+        #    status_code=303
+        #)
+    finally:
+        response = RedirectResponse(url=f"/?events={error}", status_code=303)
+        response.set_cookie(key="sender", value=str(set_sender), max_age=360000, expires=360000)
+        return response
 
 @app.get("/auth")
-async def auth_page(request: Request, uow:HTTPUnitOfWork=Depends(get_uow), sender_id: int = Query(default=0), sender_service=Depends(get_sender_service)):
+async def auth_page(request: Request, uow: HTTPUnitOfWork = Depends(get_uow), sender_id: int = Query(default=0),
+                    sender_service=Depends(get_sender_service)):
     """Страница авторизации"""
     number = await sender_service.get_number(sender=uow.repository.get_sender(sender_id=sender_id))
     sender_id = sender_id
@@ -154,8 +171,8 @@ async def process_auth(
         sender_service=Depends(get_sender_service)
 ):
     """Обработка авторизации"""
-    sender=uow.repository.get_sender(sender_id=sender_id)
-    r=await sender_service.auth(sender=sender, phone_code=phone_code,password=password, code=number)
+    sender = uow.repository.get_sender(sender_id=sender_id)
+    r = await sender_service.auth(sender=sender, phone_code=phone_code, password=password, code=number)
     if r:
         return RedirectResponse(url="/", status_code=303)
     else:
@@ -163,4 +180,4 @@ async def process_auth(
 
 
 if __name__ == "__main__":
-    uvicorn.run("web:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("web:app", host="0.0.0.0", port=8010, reload=True)

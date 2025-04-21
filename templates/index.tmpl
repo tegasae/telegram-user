@@ -121,10 +121,11 @@
 
                 <!-- Новый блок для выбора отправителя -->
                 <div class="senders-container">
+                 {{var.set_sender}}
                     <label for="senderSelect">Отправитель:</label>
                     <select id="senderSelect" name="{{form.value_field.senders}}">
                         {% for s in form.senders %}
-                            <option value="{{s.id}}">{{s.name}}</option>
+                            <option value="{{s.id}}" {%if s.id==var.set_sender%}selected{%endif%}>{{s.name}}</option>
                         {% endfor %}
                     </select>
                 </div>
