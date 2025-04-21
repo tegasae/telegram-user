@@ -254,7 +254,7 @@ class AlmostRepository(AbstractRepository):
             if s[0]==1:
                 continue
             self.auth_senders[s[0]] = {'api_id': s[1], 'api_hash': s[2], 'telegram_name': s[3], 'phone': s[4]}
-
+   #
     def get_senders(self) -> list[Sender]:
         self._fill_senders()
         senders = []
