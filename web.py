@@ -56,14 +56,13 @@ def get_sender_service() -> AbstractSenderService:
 @app.get("/", response_class=HTMLResponse)
 async def read(request: Request, events: str = Query(default=None, description="Must be integer"),
                uow: HTTPUnitOfWork = Depends(get_uow), sender_service=Depends(get_sender_service)):
-
     sender_cookie = request.cookies.get("sender", "")
-    api_hash_cookie=request.cookies.get("api_hash","")
+    api_hash_cookie = request.cookies.get("api_hash", "")
 
     try:
-        sender_cookie=int(sender_cookie)
-    except (TypeError,ValueError):
-        sender_cookie=0
+        sender_cookie = int(sender_cookie)
+    except (TypeError, ValueError):
+        sender_cookie = 0
 
     try:
         list_of_events: List[int] = [int(events)]
@@ -78,7 +77,8 @@ async def read(request: Request, events: str = Query(default=None, description="
     senders = await service.get_senders()
     messages = await service.get_messages()
     model = MyFormModelOutput(receivers=receivers, senders=senders, messages=messages, message="")
-    content = create_template(request=request, var={"set_sender":sender_cookie,"api_hash":api_hash_cookie}, form=model, events=list_of_events)
+    content = create_template(request=request, var={"set_sender": sender_cookie, "api_hash": api_hash_cookie},
+                              form=model, events=list_of_events)
     return HTMLResponse(content=content)
 
 
@@ -89,11 +89,11 @@ async def send(
         sender_id: int = Form(..., alias="senders"),
         receivers: List[int] = Form([]),
         message: str = Form(...),
-        api_hash: str = Form(...),
+        api_hash_form: str = Form("",alias="api_hash"),
         sender_service=Depends(get_sender_service)
 ):
-    set_sender=0
-    set_api_hash=api_hash
+    set_sender = 0
+    api_hash = api_hash_form
     sender_cookie = request.cookies.get("sender", "")
     api_hash_cookie = request.cookies.get("api_hash", "")
     try:
@@ -101,10 +101,13 @@ async def send(
     except (TypeError, ValueError):
         sender_cookie = 0
 
-
     if sender_id:
         set_sender = sender_id
-    error=0
+
+    if sender_cookie != sender_id and api_hash_cookie == api_hash_form:
+        api_hash = ""
+
+    error = 0
     try:
         form_data = MyFormModelInput(
             sender=sender_id,
@@ -112,23 +115,16 @@ async def send(
             message=message
         )
         service = Service(uow=uow, sender_service=sender_service)
-        sender = await service.get_sender(sender_id=form_data.sender)
+        #sender = await service.get_sender(sender_id=form_data.sender)
 
-        if sender_cookie != sender_id and api_hash_cookie == api_hash:
-            set_api_hash = ""
-
-        sender.api_hash=set_api_hash
+        #sender.api_hash = api_hash
         await service.send_new_message(
             sender_id=sender_id,
             receivers_id=form_data.receivers,
             message_text=form_data.message
         )
         error = 1
-        set_sender=form_data.sender
-        #response=RedirectResponse(url=f"/?events={error}", status_code=303)
-        #response.set_cookie(key="sender", value=str(form_data.sender),max_age=360000, expires=360000)
-
-        #return response
+        set_sender = form_data.sender
 
     except ValidationError as e:
         first_error = e.errors()[0]
@@ -144,31 +140,22 @@ async def send(
 
         field = first_error['loc'][0]
         msg = first_error['msg']
-        #return RedirectResponse(
-        #    url=f"/?events={error}",
-        #    status_code=303
-        #)
     except AuthRequired:
-        error=5
+        error = 5
         raise HTTPNotAcceptable()
 
-        # return RedirectResponse(
-        #    url=f"/auth?sender_id={sender}",
-        #    status_code=303
-        # )
+
     except Exception as e:
         # Логирование для разработчика
         print(f"Unhandled error: {str(e)}")
         error = 5
-        #return RedirectResponse(
-        #    url=f"/?events={error}",
-        #    status_code=303
-        #)
+
     finally:
         response = RedirectResponse(url=f"/?events={error}", status_code=303)
         response.set_cookie(key="sender", value=str(set_sender), max_age=360000, expires=360000)
-        response.set_cookie(key="api_hash", value=set_api_hash, max_age=360000, expires=360000)
+        response.set_cookie(key="api_hash", value=api_hash, max_age=360000, expires=360000)
         return response
+
 
 @app.get("/auth")
 async def auth_page(request: Request, uow: HTTPUnitOfWork = Depends(get_uow), sender_id: int = Query(default=0),

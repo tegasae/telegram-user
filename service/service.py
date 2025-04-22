@@ -5,9 +5,11 @@ from service.uow import FakeUnitOfWork, AbstractUnitOfWork
 
 
 class Service:
+
     def __init__(self, uow: AbstractUnitOfWork, sender_service: AbstractSenderService):
         self.uow = uow
         self.sender_service = sender_service
+
 
     @staticmethod
     def check_id(item_id: int) -> bool:
