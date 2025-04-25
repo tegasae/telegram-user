@@ -33,6 +33,8 @@ class AuthRequired(CommonException):
         self.base_message = f'Auth required'
 
 
-
+class InvalidApiHashError(CommonException):
+    def create_message(self):
+        self.base_message = f'Invalidate API hash error'
 
 

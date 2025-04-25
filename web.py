@@ -121,7 +121,8 @@ async def send(
         await service.send_new_message(
             sender_id=sender_id,
             receivers_id=form_data.receivers,
-            message_text=form_data.message
+            message_text=form_data.message,
+            api_hash=api_hash
         )
         error = 1
         set_sender = form_data.sender

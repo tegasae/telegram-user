@@ -1,5 +1,5 @@
 from adapters.sender import AbstractSenderService
-from domain.exceptions import SenderNotFound, MessageNotFound
+from domain.exceptions import SenderNotFound, MessageNotFound, InvalidApiHashError
 from domain.model import Sender, Receiver, Message, Aggregate
 from service.uow import FakeUnitOfWork, AbstractUnitOfWork
 
@@ -34,43 +34,86 @@ class Service:
         async with self.uow:
             return self.uow.repository.get_receivers()
 
-    async def send_message(self, sender_id: int, receivers_id: list[int], message_id: int):
+    async def send_message(
+            self,
+            sender_id: int,
+            receivers_id: list[int],
+            message_id: int,
+            api_hash: str | None = None
+    ):
         async with self.uow:
             message: Message = Message.empty_message()
             if self.check_id(message_id):
                 message = self.uow.repository.get_message(message_id)
                 if message_id != message.id:
                     raise MessageNotFound()
-            await self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+            await self._send(
+                sender_id=sender_id,
+                receivers_id=receivers_id,
+                message=message,
+                api_hash=api_hash
+            )
 
-    async def send_new_message(self, sender_id: int, receivers_id: list[int], message_text: str):
+    async def send_new_message(
+            self,
+            sender_id: int,
+            receivers_id: list[int],
+            message_text: str,
+            api_hash: str | None = None
+    ):
         message: Message = Message(id=0, message=message_text)
         async with self.uow:
-            await self._send(sender_id=sender_id, receivers_id=receivers_id, message=message)
+            await self._send(
+                sender_id=sender_id,
+                receivers_id=receivers_id,
+                message=message,
+                api_hash=api_hash
+            )
 
-    async def auth(self, sender_id: int, *args, **kwargs) -> bool:
-        sender: Sender = Sender.empty_sender()
+    async def _validate_participants(
+            self,
+            sender_id: int,
+            receivers_id: list[int],
+            api_hash: str | None = None  # Новый параметр для входящего хэша
+    ) -> tuple[Sender, list[Receiver]]:
+        """Проверяет валидность отправителя (включая api_hash) и получателей"""
+        sender = Sender.empty_sender()
         if self.check_id(sender_id):
             sender = self.uow.repository.get_sender(sender_id=sender_id)
             if sender_id != sender.id:
                 raise SenderNotFound()
 
-        r = await self.sender_service.auth(sender, phone_code=kwargs['phone_code'], password=kwargs['password'])
-        return r
+            # Проверка api_hash, если он требуется
+            if api_hash is not None:
+                if sender.api_hash != api_hash:
+                    raise InvalidApiHashError("Неверный API-хэш отправителя")
 
-    async def _send(self, sender_id: int, receivers_id: list[int], message: Message):
         receivers = []
-        sender: Sender = Sender.empty_sender()
-        if self.check_id(sender_id):
-            sender = self.uow.repository.get_sender(sender_id=sender_id)
-            if sender_id != sender.id:
-                raise SenderNotFound()
-
-        for r in receivers_id:
-            if self.check_id(r):
-                receiver = self.uow.repository.get_receiver(r)
-                if r == receiver.id:
+        for receiver_id in receivers_id:
+            if self.check_id(receiver_id):
+                receiver = self.uow.repository.get_receiver(receiver_id)
+                if receiver_id == receiver.id:
                     receivers.append(receiver)
 
+        if not receivers:
+            raise ValueError("Должен быть хотя бы один валидный получатель")
+
+        return sender, receivers
+
+    async def _send(
+            self,
+            sender_id: int,
+            receivers_id: list[int],
+            message: Message,
+            api_hash: str | None = None
+    ):
+        sender, receivers = await self._validate_participants(
+            sender_id=sender_id,
+            receivers_id=receivers_id,
+            api_hash=api_hash
+        )
         aggregate = Aggregate(sender=sender, receivers=receivers, message=message)
         await self.sender_service.send(aggregate)
+
+
+
