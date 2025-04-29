@@ -71,8 +71,9 @@ class FakeUnitOfWork(AbstractUnitOfWork):
 
 
 class AlmostUnitOfWork(AbstractUnitOfWork):
-    repository:AlmostRepository
-    def __init__(self,conn:sqlite3.Connection):
+    repository: AlmostRepository
+
+    def __init__(self, conn: sqlite3.Connection):
         self.repository = AlmostRepository(conn=conn)
 
     def _commit(self):
@@ -88,10 +89,9 @@ class AlmostUnitOfWork(AbstractUnitOfWork):
 class HTTPUnitOfWork(AbstractUnitOfWork):
     repository: HTTPRepository
 
-    def __init__(self, url,conn:sqlite3.Connection):
-        self.repository = HTTPRepository(url,conn=conn)
+    def __init__(self, url, conn: sqlite3.Connection):
+        self.repository = HTTPRepository(url, conn=conn)
         self._initialized = False
-
 
     async def _initialize(self):
         """Явная инициализация"""
@@ -103,7 +103,6 @@ class HTTPUnitOfWork(AbstractUnitOfWork):
         if hasattr(self, '_initialize'):
             await self._initialize()
         return self
-
 
     def _commit(self):
         print("HTTP commit")
